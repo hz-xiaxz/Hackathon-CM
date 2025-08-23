@@ -17,18 +17,16 @@ def run_ising_ed_calculation(L: int, J: float, h: float) -> float:
     h_field = [[-h, i] for i in range(L)]
     J_zz = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
     static_spin = [["zz", J_zz], ["x", h_field]]
-    
+
     min_energy = None
 
     # loop over spin inversion symmetry blocks
     for zblock in [-1, 1]:
         basis_spin = spin_basis_1d(L=L, zblock=zblock)
-        H_spin = hamiltonian(
-            static_spin, [], basis=basis_spin, dtype=np.float64
-        )
+        H_spin = hamiltonian(static_spin, [], basis=basis_spin)
         # calculate the lowest eigenvalue in the sector
-        E_sector = H_spin.eigvalsh(k=1, which='SA') # 'SA' means smallest algebraic value
-        
+        E_sector = H_spin.eigvalsh()  # 'SA' means smallest algebraic value
+
         if min_energy is None or E_sector[0] < min_energy:
             min_energy = E_sector[0]
 

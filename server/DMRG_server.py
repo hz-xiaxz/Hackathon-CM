@@ -6,7 +6,7 @@ from tenpy.networks.mps import MPS
 from tenpy.algorithms import dmrg
 import matplotlib.pyplot as plt
 from mcp.server.fastmcp import FastMCP
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Literal
 
 # 1. Create the MCP server instance
 mcp = FastMCP("TenPy TFIM Analysis Server")
@@ -33,9 +33,9 @@ def run_dmrg_calculation(
     }
 
     M = TFIChain(model_params)
-    initial_state = (["up", "down"] * L_unit_cell)[:L_unit_cell]
+    initial_state = ["down"] * L_unit_cell
+
     psi = MPS.from_product_state(M.lat.mps_sites(), initial_state, M.lat.bc_MPS)
-    np.set_printoptions(linewidth=120)
 
     engine = dmrg.TwoSiteDMRGEngine(psi, M, dmrg_params)
     E0, psi = engine.run()
@@ -129,13 +129,26 @@ def analyze_convergence_with_L(
 def analyze_L_convergence(
     g: float,
     L_values_str: str | None = None,
-    chi_max: int | None = None,
+    chi_max: int = 500,
     J: float = 1.0,
     threshold: float = 1e-5,
     create_plot: bool = False,
 ) -> Dict[str, Any]:
     """
     Analyzes the convergence of iDMRG energy with respect to the unit cell size.
+
+    Args:
+        g: The strength of the transverse magnetic field (h in ED).
+        L_values_str: Comma-separated string of system sizes to compare.
+        chi_max: The bond dimension to use for the DMRG calculations.
+        J: The Ising coupling strength.
+        threshold: The energy difference threshold for convergence.
+        create_plot: Whether to generate a plot of the results.
+    Returns:
+        A dictionary containing the convergence results and optionally the plot file path.
+
+        The "plot_file_path" key will contain the absolute path to the saved plot image if `create_plot` is True. Please render as image
+
     """
     if L_values_str:
         L_values = [int(L.strip()) for L in L_values_str.split(",")]
@@ -167,6 +180,21 @@ def analyze_convergence_with_chi(
 ) -> Dict[str, Any]:
     """
     Analyzes the convergence of iDMRG energy with respect to the bond dimension.
+
+    Analyzes the convergence of iDMRG energy with respect to the unit cell size.
+
+    Args:
+        g: The strength of the transverse magnetic field (h in ED).
+        L_values_str: Comma-separated string of system sizes to compare.
+        chi_values: List of bond dimensions to test.
+        J: The Ising coupling strength.
+        threshold: The energy difference threshold for convergence.
+        create_plot: Whether to generate a plot of the results.
+    Returns:
+        A dictionary containing the convergence results and optionally the plot file path.
+
+        The "plot_file_path" key will contain the absolute path to the saved plot image if `create_plot` is True. Please render as image
+
     """
     results_by_chi = {
         "chi_values": [],
@@ -211,7 +239,7 @@ def analyze_chi_convergence(
     if chi_values_str:
         chi_values = [int(chi.strip()) for chi in chi_values_str.split(",")]
     else:
-        base_chi = [20, 40, 60, 80, 100]
+        base_chi = [50, 80, 110, 140, 170]
         if L_unit_cell >= 4:
             base_chi = [c + 20 for c in base_chi]
 
