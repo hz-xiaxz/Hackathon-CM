@@ -40,10 +40,12 @@ def run_ising_ed_calculation(L: int, J: float, h: float) -> float:
 def Ising_ED(L: int, J: float, h: float) -> float:
     """Calculates the ground state energy of the Transverse Field Ising Model (TFIM).
     Args:
-        L: The length of the Ising chain.
+        L: The length of the Ising chain. L > 12 may allocate too much memory.
         J: The strength of the zz interaction.
         h: The strength of the transverse magnetic field in the x direction.
     """
+    if L > 12:
+        raise ValueError("L > 12 may allocate too much memory.")
     return run_ising_ed_calculation(L, J, h)
 
 
