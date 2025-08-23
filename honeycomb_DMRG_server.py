@@ -7,7 +7,7 @@ from tenpy.models.haldane import FermionicHaldaneModel
 
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("honeycomb_solver")
+mcp = FastMCP("honeycomb_DMRG_solver")
 
 @mcp.tool()
 def honeycomb_solver(
