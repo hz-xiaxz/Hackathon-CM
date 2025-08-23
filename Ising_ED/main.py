@@ -1,91 +1,91 @@
 ####################################################################
 #                            example 4                              #
-#    In this script we demonstrate how to construct fermionic       #
-#    Hamiltonians, and check the Jordan-Wigner transformation.      #
+#    in this script we demonstrate how to construct fermionic       #
+#    hamiltonians, and check the jordan-wigner transformation.      #
 #####################################################################
-from quspin.operators import hamiltonian  # Hamiltonians and operators
+from quspin.operators import hamiltonian  # hamiltonians and operators
 from quspin.basis import (
     spin_basis_1d,
     spinless_fermion_basis_1d,
-)  # Hilbert space spin basis
+)  # hilbert space spin basis
 import numpy as np  # generic math functions
 import matplotlib.pyplot as plt  # plotting library
 
 #
 ##### define model parameters #####
-L = 8  # system size
-J = 1.0  # spin zz interaction
+l = 8  # system size
+j = 1.0  # spin zz interaction
 h = np.sqrt(2)  # z magnetic field strength
 #
 # loop over spin inversion symmetry block variable and boundary conditions
-for zblock, PBC in zip([-1, 1], [1, -1]):
+for zblock, pbc in zip([-1, 1], [1, -1]):
     #
     ##### define spin model
-    # site-coupling lists (PBC for both spin inversion sectors)
-    h_field = [[-h, i] for i in range(L)]
-    J_zz = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
+    # site-coupling lists (pbc for both spin inversion sectors)
+    h_field = [[-h, i] for i in range(l)]
+    j_zz = [[-j, i, (i + 1) % l] for i in range(l)]  # pbc
     # define spin static and dynamic lists
-    static_spin = [["zz", J_zz], ["x", h_field]]  # static part of H
-    dynamic_spin = []  # time-dependent part of H
-    # construct spin basis in pos/neg spin inversion sector depending on APBC/PBC
-    basis_spin = spin_basis_1d(L=L, zblock=zblock)
-    # build spin Hamiltonians
-    H_spin = hamiltonian(static_spin, dynamic_spin, basis=basis_spin, dtype=np.float64)
+    static_spin = [["zz", j_zz], ["x", h_field]]  # static part of h
+    dynamic_spin = []  # time-dependent part of h
+    # construct spin basis in pos/neg spin inversion sector depending on apbc/pbc
+    basis_spin = spin_basis_1d(l=l, zblock=zblock)
+    # build spin hamiltonians
+    h_spin = hamiltonian(static_spin, dynamic_spin, basis=basis_spin, dtype=np.float64)
     # calculate spin energy levels
-    E_spin = H_spin.eigvalsh()
+    e_spin = h_spin.eigvalsh()
     #
     ##### define fermion model
     # define site-coupling lists for external field
-    h_pot = [[2.0 * h, i] for i in range(L)]
-    if PBC == 1:  # periodic BC: odd particle number subspace only
+    h_pot = [[2.0 * h, i] for i in range(l)]
+    if pbc == 1:  # periodic bc: odd particle number subspace only
         # define site-coupling lists (including boudary couplings)
-        J_pm = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
-        J_mp = [[+J, i, (i + 1) % L] for i in range(L)]  # PBC
-        J_pp = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
-        J_mm = [[+J, i, (i + 1) % L] for i in range(L)]  # PBC
+        j_pm = [[-j, i, (i + 1) % l] for i in range(l)]  # pbc
+        j_mp = [[+j, i, (i + 1) % l] for i in range(l)]  # pbc
+        j_pp = [[-j, i, (i + 1) % l] for i in range(l)]  # pbc
+        j_mm = [[+j, i, (i + 1) % l] for i in range(l)]  # pbc
         # construct fermion basis in the odd particle number subsector
-        basis_fermion = spinless_fermion_basis_1d(L=L, Nf=range(1, L + 1, 2))
-    elif PBC == -1:  # anti-periodic BC: even particle number subspace only
+        basis_fermion = spinless_fermion_basis_1d(l=l, nf=range(1, l + 1, 2))
+    elif pbc == -1:  # anti-periodic bc: even particle number subspace only
         # define bulk site coupling lists
-        J_pm = [[-J, i, i + 1] for i in range(L - 1)]
-        J_mp = [[+J, i, i + 1] for i in range(L - 1)]
-        J_pp = [[-J, i, i + 1] for i in range(L - 1)]
-        J_mm = [[+J, i, i + 1] for i in range(L - 1)]
-        # add boundary coupling between sites (L-1,0)
-        J_pm.append([+J, L - 1, 0])  # APBC
-        J_mp.append([-J, L - 1, 0])  # APBC
-        J_pp.append([+J, L - 1, 0])  # APBC
-        J_mm.append([-J, L - 1, 0])  # APBC
+        j_pm = [[-j, i, i + 1] for i in range(l - 1)]
+        j_mp = [[+j, i, i + 1] for i in range(l - 1)]
+        j_pp = [[-j, i, i + 1] for i in range(l - 1)]
+        j_mm = [[+j, i, i + 1] for i in range(l - 1)]
+        # add boundary coupling between sites (l-1,0)
+        j_pm.append([+j, l - 1, 0])  # apbc
+        j_mp.append([-j, l - 1, 0])  # apbc
+        j_pp.append([+j, l - 1, 0])  # apbc
+        j_mm.append([-j, l - 1, 0])  # apbc
         # construct fermion basis in the even particle number subsector
-        basis_fermion = spinless_fermion_basis_1d(L=L, Nf=range(0, L + 1, 2))
+        basis_fermion = spinless_fermion_basis_1d(l=l, nf=range(0, l + 1, 2))
     # define fermionic static and dynamic lists
     static_fermion = [
-        ["+-", J_pm],
-        ["-+", J_mp],
-        ["++", J_pp],
-        ["--", J_mm],
+        ["+-", j_pm],
+        ["-+", j_mp],
+        ["++", j_pp],
+        ["--", j_mm],
         ["z", h_pot],
     ]
     dynamic_fermion = []
-    # build fermionic Hamiltonian
-    H_fermion = hamiltonian(
+    # build fermionic hamiltonian
+    h_fermion = hamiltonian(
         static_fermion,
         dynamic_fermion,
         basis=basis_fermion,
         dtype=np.float64,
-        check_pcon=False,
-        check_symm=False,
+        check_pcon=false,
+        check_symm=false,
     )
     # calculate fermionic energy levels
-    E_fermion = H_fermion.eigvalsh()
+    e_fermion = h_fermion.eigvalsh()
     #
     ##### plot spectra
     plt.plot(
-        np.arange(H_fermion.Ns), E_fermion / L, marker="o", color="b", label="fermion"
+        np.arange(h_fermion.ns), e_fermion / l, marker="o", color="b", label="fermion"
     )
     plt.plot(
-        np.arange(H_spin.Ns),
-        E_spin / L,
+        np.arange(h_spin.ns),
+        e_spin / l,
         marker="x",
         color="r",
         markersize=2,
