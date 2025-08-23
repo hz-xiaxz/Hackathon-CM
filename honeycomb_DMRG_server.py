@@ -54,7 +54,7 @@ def honeycomb_solver(
     M = FermionicHaldaneModel(model_params)
 
     # Choose an initial state
-    prod_state = ['empty', 'full'] * (model_params['Lx'] * model_params['Ly'])
+    prod_state = ['full', 'empty'] * (model_params['Lx'] * model_params['Ly'])
 
     psi = MPS.from_product_state(M.lat.mps_sites(), prod_state, bc=M.lat.bc_MPS)
 
@@ -73,7 +73,7 @@ def honeycomb_solver(
         "parameters": {
             "t": t, "U": U, "Ly": Ly, "chi_max": chi_max, "seed": seed
         },
-        "ground_state_energy_density": float(E0),  # per site (iDMRG)
+        "energy_density": float(E0),  # per site (iDMRG)
         "entanglement_entropy": list(map(float, S)),
         "correlation_length": float(xi),
         "chi": chi if isinstance(chi, int) else list(map(int, chi)),
