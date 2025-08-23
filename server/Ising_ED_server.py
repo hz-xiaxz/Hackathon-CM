@@ -14,26 +14,25 @@ def run_ising_ed_calculation(L: int, J: float, h: float) -> float:
         J: The strength of the zz interaction.
         h: The strength of the transverse magnetic field in the x direction.
     """
-    # loop over spin inversion symmetry block variable and boundary conditions
-    for zblock, PBC in zip([-1, 1], [1, -1]):
-        #
-        ##### define spin model
-        # site-coupling lists (PBC for both spin inversion sectors)
-        h_field = [[-h, i] for i in range(L)]
-        J_zz = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
-        # define spin static and dynamic lists
-        static_spin = [["zz", J_zz], ["x", h_field]]  # static part of H
-        dynamic_spin = []  # time-dependent part of H
-        # construct spin basis in pos/neg spin inversion sector depending on APBC/PBC
-        basis_spin = spin_basis_1d(L=L, zblock=zblock)
-        # build spin Hamiltonians
-        H_spin = hamiltonian(
-            static_spin, dynamic_spin, basis=basis_spin, dtype=np.float64
-        )
-        # calculate spin energy levels
-        E_spin = H_spin.eigvalsh()
+    h_field = [[-h, i] for i in range(L)]
+    J_zz = [[-J, i, (i + 1) % L] for i in range(L)]  # PBC
+    static_spin = [["zz", J_zz], ["x", h_field]]
+    
+    min_energy = None
 
-    return (E_spin / L)[0]
+    # loop over spin inversion symmetry blocks
+    for zblock in [-1, 1]:
+        basis_spin = spin_basis_1d(L=L, zblock=zblock)
+        H_spin = hamiltonian(
+            static_spin, [], basis=basis_spin, dtype=np.float64
+        )
+        # calculate the lowest eigenvalue in the sector
+        E_sector = H_spin.eigvalsh(k=1, which='SA') # 'SA' means smallest algebraic value
+        
+        if min_energy is None or E_sector[0] < min_energy:
+            min_energy = E_sector[0]
+
+    return min_energy / L
 
 
 @mcp.tool()

@@ -13,21 +13,14 @@ mcp = FastMCP("TenPy TFIM Analysis Server")
 
 
 def run_dmrg_calculation(
-    g: float, L: int, chi_max: int, J: float, boundary_condition: str
+    g: float, L_unit_cell: int, chi_max: int, J: float
 ) -> Dict[str, Any]:
     """
-    Performs the core DMRG calculation.
+    Performs the core iDMRG calculation for an infinite system.
     """
-    print(f"Running DMRG for TFIM with g={g}, J={J}, chi_max={chi_max}, L={L}, bc={boundary_condition}...")
+    print(f"Running infinite DMRG for TFIM with g={g}, J={J}, chi_max={chi_max}...")
 
-    if boundary_condition == 'infinite':
-        bc_mps = 'infinite'
-    elif boundary_condition == 'open':
-        bc_mps = 'finite'
-    else:
-        raise ValueError(f"Unsupported boundary condition: {boundary_condition}")
-
-    model_params = dict(L=L, J=J, g=g, bc_MPS=bc_mps, conserve=None)
+    model_params = dict(L=L_unit_cell, J=J, g=g, bc_MPS="infinite", conserve=None)
 
     dmrg_params = {
         "trunc_params": {"chi_max": chi_max, "svd_min": 1.0e-10},
@@ -40,79 +33,93 @@ def run_dmrg_calculation(
     }
 
     M = TFIChain(model_params)
-    initial_state = (["up", "down"] * L)[:L]
+    initial_state = (["up", "down"] * L_unit_cell)[:L_unit_cell]
     psi = MPS.from_product_state(M.lat.mps_sites(), initial_state, M.lat.bc_MPS)
     np.set_printoptions(linewidth=120)
 
     engine = dmrg.TwoSiteDMRGEngine(psi, M, dmrg_params)
     E0, psi = engine.run()
 
-    energy_density = E0 / L
-
-    entanglement_entropy = psi.entanglement_entropy()
-    if boundary_condition == 'open' and len(entanglement_entropy) > 0:
-        entanglement_entropy = entanglement_entropy[len(entanglement_entropy)//2]
-    elif len(entanglement_entropy) > 0:
-        entanglement_entropy = entanglement_entropy[0]
-    else:
-        entanglement_entropy = 0.0
-
+    energy_density = E0 / L_unit_cell
+    entanglement_entropy = psi.entanglement_entropy()[0]
     correlation_length = psi.correlation_length(tol_ev0=1.0e-3)
     magnetization_z = np.mean(psi.expectation_value("Sigmaz"))
-    
-    max_corr_dist = 20
-    if boundary_condition == 'open':
-        max_corr_dist = min(20, L - 1)
-    
-    if max_corr_dist > 0:
-        correlation_xx = psi.correlation_function("Sigmax", "Sigmax", [0], max_corr_dist)[0, :]
-        correlation_xx = correlation_xx.tolist()
-    else:
-        correlation_xx = []
-
+    correlation_xx = psi.correlation_function("Sigmax", "Sigmax", [0], 20)[0, :]
 
     print("DMRG calculation finished successfully.")
 
     results = {
-        "parameters": {"g": g, "L": L, "J": J, "chi_max": chi_max, "boundary_condition": boundary_condition},
+        "parameters": {"g": g, "L_unit_cell": L_unit_cell, "J": J, "chi_max": chi_max},
         "ground_state_energy_density": energy_density,
         "entanglement_entropy": entanglement_entropy,
         "correlation_length": correlation_length,
         "magnetization_z": magnetization_z,
-        "correlation_xx": correlation_xx,
+        "correlation_xx": correlation_xx.tolist(),
     }
 
     return results
 
 
-def analyze_convergence_with_L(
-    g: float, L_values: List[int], chi_max: int, J: float, threshold: float, boundary_condition: str
-) -> Dict[str, List[Any]]:
+def plot_convergence_data(results: Dict[str, Any], param_name: str) -> str:
     """
-    Analyzes the convergence of DMRG ground state energy with respect to the size L.
-    Stops when the change in energy is below the threshold.
+    Generates and saves a plot of the convergence data.
+
+    Args:
+        results (dict): The dictionary returned by a convergence analysis function.
+        param_name (str): The name of the parameter that was varied (e.g., 'L' or 'chi').
+
+    Returns:
+        str: The absolute file path of the generated plot image.
+    """
+    param_values = results[f"{param_name}_values"]
+    energy_values = results["ground_state_energy_density"]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(param_values, energy_values, marker="o", linestyle="-")
+    plt.xlabel(f"Parameter: {param_name}")
+    plt.ylabel("Ground State Energy Density")
+    plt.title(f"DMRG Convergence: Energy vs. {param_name}")
+    plt.grid(True)
+
+    plot_filename = f"dmrg_convergence_{param_name}.png"
+    absolute_path = f"/home/hzxiaxz/hackathon/server/{plot_filename}"
+    plt.savefig(absolute_path)
+    print(f"Convergence plot saved to {absolute_path}")
+
+    return absolute_path
+
+
+def analyze_convergence_with_L(
+    g: float, L_values: List[int], chi_max: int, J: float, threshold: float
+) -> Dict[str, Any]:
+    """
+    Analyzes the convergence of iDMRG ground state energy with respect to the unit cell size.
     """
     results_by_L = {
-        "L_values": [],
+        "L_unit_cell_values": [],
         "ground_state_energy_density": [],
         "convergence_reached": False,
     }
-    
+
     last_energy = None
 
-    for L in L_values:
-        result = run_dmrg_calculation(g=g, L=L, chi_max=chi_max, J=J, boundary_condition=boundary_condition)
+    for L_unit_cell in L_values:
+        result = run_dmrg_calculation(
+            g=g, L_unit_cell=L_unit_cell, chi_max=chi_max, J=J
+        )
         energy = result["ground_state_energy_density"]
-        
-        results_by_L["L_values"].append(L)
+
+        results_by_L["L_unit_cell_values"].append(L_unit_cell)
         results_by_L["ground_state_energy_density"].append(energy)
 
         if last_energy is not None:
             if abs(energy - last_energy) < threshold:
                 results_by_L["convergence_reached"] = True
-                print(f"Convergence reached at L={L} with energy difference {abs(energy - last_energy)}")
+                print(
+                    f"Convergence reached at L_unit_cell={L_unit_cell} with energy difference {abs(energy - last_energy)}"
+                )
                 break
-        
+
         last_energy = energy
 
     return results_by_L
@@ -120,75 +127,70 @@ def analyze_convergence_with_L(
 
 @mcp.tool()
 def analyze_L_convergence(
-    g: float, L_values_str: str | None = None, chi_max: int | None = None, J: float = 1.0, threshold: float = 1e-5,
-    boundary_condition: str = 'open'
-) -> Dict[str, List[Any]]:
+    g: float,
+    L_values_str: str | None = None,
+    chi_max: int | None = None,
+    J: float = 1.0,
+    threshold: float = 1e-5,
+    create_plot: bool = False,
+) -> Dict[str, Any]:
     """
-    Analyzes the convergence of DMRG ground state energy with respect to the size L.
-    Note: A boundary condition ('open' or 'infinite') must be specified for the DMRG calculation.
-
-    Args:
-        g: The strength of the transverse magnetic field.
-        L_values_str: Optional. A comma-separated string of sizes to test (e.g., "10,20,30").
-                      If not provided, a default list is used.
-        chi_max: Optional. The maximum bond dimension. If not provided, it's determined
-                 automatically by running convergence analysis for the largest L.
-        J: The Ising coupling strength. Defaults to 1.0.
-        threshold: The convergence threshold for the energy difference. Defaults to 1e-5.
-        boundary_condition: The boundary condition, 'open' or 'infinite'. Defaults to 'open'.
-
-    Returns:
-        A dictionary with results for each L, and whether convergence was reached.
+    Analyzes the convergence of iDMRG energy with respect to the unit cell size.
     """
-    if boundary_condition not in ['open', 'infinite']:
-        raise ValueError("boundary_condition must be 'open' or 'infinite'")
-    
     if L_values_str:
-        L_values = [int(L.strip()) for L in L_values_str.split(',')]
+        L_values = [int(L.strip()) for L in L_values_str.split(",")]
     else:
-        if boundary_condition == 'open':
-            L_values = [10, 20, 30, 40, 50]
-        else: # infinite
-            L_values = [2, 4, 6, 8, 10]
+        L_values = [2, 4, 6, 8, 10]
 
     if chi_max is None:
         largest_L = max(L_values)
-        print(f"chi_max not provided. Running convergence analysis for largest L={largest_L} to find a suitable value.")
-        convergence_results = analyze_chi_convergence(g, largest_L, None, J, boundary_condition)
+        print(
+            f"chi_max not provided. Running convergence for largest L_unit_cell={largest_L} to find a suitable value."
+        )
+        convergence_results = analyze_chi_convergence(g, largest_L, None, J)
         chi_max = convergence_results["chi_values"][-1]
-        print(f"Convergence analysis complete. Using chi_max = {chi_max} for all L values.")
+        print(
+            f"Convergence analysis complete. Using chi_max = {chi_max} for all L_unit_cell values."
+        )
 
-    return analyze_convergence_with_L(g, L_values, chi_max, J, threshold, boundary_condition)
+    results = analyze_convergence_with_L(g, L_values, chi_max, J, threshold)
+
+    if create_plot:
+        plot_path = plot_convergence_data(results, "L_unit_cell")
+        results["plot_file_path"] = plot_path
+
+    return results
 
 
 def analyze_convergence_with_chi(
-    g: float, L: int, chi_values: List[int], J: float, boundary_condition: str, threshold: float
-) -> Dict[str, List[Any]]:
+    g: float, L_unit_cell: int, chi_values: List[int], J: float, threshold: float
+) -> Dict[str, Any]:
     """
-    Analyzes the convergence of DMRG ground state energy with respect to the bond dimension chi.
-    Stops when the change in energy is below the threshold.
+    Analyzes the convergence of iDMRG energy with respect to the bond dimension.
     """
     results_by_chi = {
         "chi_values": [],
         "ground_state_energy_density": [],
         "convergence_reached": False,
     }
-    
+
     last_energy = None
 
     for chi in chi_values:
-        result = run_dmrg_calculation(g=g, L=L, chi_max=chi, J=J, boundary_condition=boundary_condition)
+        result = run_dmrg_calculation(g=g, L_unit_cell=L_unit_cell, chi_max=chi, J=J)
         energy = result["ground_state_energy_density"]
-        
+
         results_by_chi["chi_values"].append(chi)
         results_by_chi["ground_state_energy_density"].append(energy)
 
         if last_energy is not None:
             if abs(energy - last_energy) < threshold:
                 results_by_chi["convergence_reached"] = True
-                print(f"Convergence reached at chi={chi} with energy difference {abs(energy - last_energy)}")
+                print(
+                    f"Convergence reached at chi={chi} with energy difference {abs(energy - last_energy)}"
+                )
                 break
-        
+
         last_energy = energy
 
     return results_by_chi
@@ -196,80 +198,59 @@ def analyze_convergence_with_chi(
 
 @mcp.tool()
 def analyze_chi_convergence(
-    g: float, L: int, chi_values_str: str | None = None, J: float = 1.0, boundary_condition: str = 'open',
-    threshold: float = 1e-6
-) -> Dict[str, List[Any]]:
+    g: float,
+    L_unit_cell: int,
+    chi_values_str: str | None = None,
+    J: float = 1.0,
+    threshold: float = 1e-6,
+    create_plot: bool = False,
+) -> Dict[str, Any]:
     """
-    Analyzes the convergence of DMRG ground state energy with respect to the bond dimension chi.
-    Note: A boundary condition ('open' or 'infinite') must be specified for the DMRG calculation.
-
-    Args:
-        g: The strength of the transverse magnetic field.
-        L: The number of sites. For 'open' bc, this is the total length.
-           For 'infinite' bc, this is the unit cell size.
-        chi_values_str: Optional. A comma-separated string of bond dimensions to test.
-                        If not provided, a default set of values is used.
-        J: The Ising coupling strength. Defaults to 1.0.
-        boundary_condition: The boundary condition, 'open' or 'infinite'. Defaults to 'open'.
-        threshold: The convergence threshold for the energy difference. Defaults to 1e-6.
-
-    Returns:
-        A dictionary with results for each chi, and whether convergence was reached.
+    Analyzes the convergence of iDMRG energy with respect to the bond dimension.
     """
-    if boundary_condition not in ['open', 'infinite']:
-        raise ValueError("boundary_condition must be 'open' or 'infinite'")
-
     if chi_values_str:
-        chi_values = [int(chi.strip()) for chi in chi_values_str.split(',')]
+        chi_values = [int(chi.strip()) for chi in chi_values_str.split(",")]
     else:
         base_chi = [20, 40, 60, 80, 100]
-        if L >= 20 and boundary_condition == 'open':
+        if L_unit_cell >= 4:
             base_chi = [c + 20 for c in base_chi]
-        
+
         if abs(g - J) < 0.1:
             chi_values = [c * 2 for c in base_chi]
         elif abs(g - J) < 0.4:
             chi_values = [int(c * 1.5) for c in base_chi]
         else:
             chi_values = base_chi
-        
+
         chi_values = sorted(list(set(chi_values)))
 
-    return analyze_convergence_with_chi(g, L, chi_values, J, boundary_condition, threshold)
+    results = analyze_convergence_with_chi(g, L_unit_cell, chi_values, J, threshold)
+
+    if create_plot:
+        plot_path = plot_convergence_data(results, "chi")
+        results["plot_file_path"] = plot_path
+
+    return results
 
 
 @mcp.tool()
 def analyze_tfim_with_dmrg(
-    g: float, L: int = 10, chi_max: int | None = None, J: float = 1.0, boundary_condition: str = 'open'
+    g: float, L_unit_cell: int = 2, chi_max: int | None = None, J: float = 1.0
 ) -> Dict[str, Any]:
     """
-    Calculates ground state properties of the TFIM using DMRG.
-    Note: A boundary condition ('open' or 'infinite') must be specified for the DMRG calculation.
-
-    Args:
-        g: The strength of the transverse magnetic field.
-        L: The number of sites. For 'open' bc, this is the total length.
-           For 'infinite' bc, this is the unit cell size. Defaults to 10.
-        chi_max: Optional. The maximum bond dimension. If not provided, the tool will
-                 automatically determine a suitable bond dimension by checking for convergence.
-        J: The Ising coupling strength. Defaults to 1.0.
-        boundary_condition: The boundary condition, 'open' or 'infinite'. Defaults to 'open'.
-
-    Returns:
-        A dictionary containing the calculated ground state properties.
+    Calculates ground state properties of the infinite TFIM using DMRG.
     """
-    if boundary_condition not in ['open', 'infinite']:
-        raise ValueError("boundary_condition must be 'open' or 'infinite'")
-
     if chi_max is not None:
-        return run_dmrg_calculation(g, L, chi_max, J, boundary_condition)
+        return run_dmrg_calculation(g, L_unit_cell, chi_max, J)
     else:
-        print("chi_max not provided. Running convergence analysis to find a suitable value.")
-        convergence_results = analyze_chi_convergence(g, L, None, J, boundary_condition)
-        
+        print(
+            "chi_max not provided. Running convergence analysis to find a suitable value."
+        )
+        convergence_results = analyze_chi_convergence(g, L_unit_cell, None, J)
+
         final_chi = convergence_results["chi_values"][-1]
         print(f"Convergence analysis complete. Using final chi_max = {final_chi}")
-        return run_dmrg_calculation(g, L, final_chi, J, boundary_condition)
+        return run_dmrg_calculation(g, L_unit_cell, final_chi, J)
 
 
 if __name__ == "__main__":
