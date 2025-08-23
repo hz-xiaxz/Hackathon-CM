@@ -1,5 +1,7 @@
 # Copyright (C) TeNPy Developers, Apache license
 
+# Note: This script is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+
 import numpy as np
 from tenpy.models.tf_ising import TFIChain
 from tenpy.networks.mps import MPS
@@ -16,7 +18,25 @@ def run_dmrg_calculation(
     g: float, L_unit_cell: int, chi_max: int, J: float
 ) -> Dict[str, Any]:
     """
-    Performs the core iDMRG calculation for an infinite system.
+    Performs the core infinite Density Matrix Renormalization Group (iDMRG) calculation
+    for an infinite Transverse Field Ising Model (TFIM).
+    Note: This function is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
+
+    Args:
+        g: The strength of the transverse magnetic field.
+        L_unit_cell: The length of the unit cell used in the iDMRG calculation.
+        chi_max: The maximum bond dimension allowed in the MPS.
+        J: The Ising coupling strength.
+
+    Returns:
+        A dictionary containing the calculation results, including:
+        - "parameters": A dictionary of input parameters.
+        - "ground_state_energy_density": The calculated ground state energy per site.
+        - "entanglement_entropy": The entanglement entropy of the ground state.
+        - "correlation_length": The correlation length of the ground state.
+        - "magnetization_z": The average magnetization in the z-direction.
+        - "correlation_xx": A list of spin-spin correlations in the x-direction.
     """
     print(f"Running infinite DMRG for TFIM with g={g}, J={J}, chi_max={chi_max}...")
 
@@ -93,7 +113,21 @@ def analyze_convergence_with_L(
     g: float, L_values: List[int], chi_max: int, J: float, threshold: float
 ) -> Dict[str, Any]:
     """
-    Analyzes the convergence of iDMRG ground state energy with respect to the unit cell size.
+    Helper function to analyze the convergence of iDMRG ground state energy with respect to the unit cell size.
+    It iteratively calls `run_dmrg_calculation` for different unit cell sizes.
+    Note: This function is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
+
+    Args:
+        g: The strength of the transverse magnetic field.
+        L_values: A list of unit cell lengths to test for convergence.
+        chi_max: The maximum bond dimension allowed in the MPS for each DMRG calculation.
+        J: The Ising coupling strength.
+        threshold: The energy difference threshold to determine convergence.
+
+    Returns:
+        A dictionary containing the L_unit_cell values tested, corresponding ground state energy densities,
+        and a boolean indicating if convergence was reached within the given threshold.
     """
     results_by_L = {
         "L_unit_cell_values": [],
@@ -135,7 +169,10 @@ def analyze_L_convergence(
     create_plot: bool = False,
 ) -> Dict[str, Any]:
     """
-    Analyzes the convergence of iDMRG energy with respect to the unit cell size.
+    MCP Tool: Analyzes the convergence of iDMRG energy with respect to the unit cell size.
+    This tool is exposed via the MCP server for external consumption.
+    Note: This tool is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
 
     Args:
         g: The strength of the transverse magnetic field (h in ED).
@@ -179,22 +216,21 @@ def analyze_convergence_with_chi(
     g: float, L_unit_cell: int, chi_values: List[int], J: float, threshold: float
 ) -> Dict[str, Any]:
     """
-    Analyzes the convergence of iDMRG energy with respect to the bond dimension.
-
-    Analyzes the convergence of iDMRG energy with respect to the unit cell size.
+    Helper function to analyze the convergence of iDMRG ground state energy with respect to the bond dimension.
+    It iteratively calls `run_dmrg_calculation` for different bond dimensions.
+    Note: This function is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
 
     Args:
-        g: The strength of the transverse magnetic field (h in ED).
-        L_values_str: Comma-separated string of system sizes to compare.
-        chi_values: List of bond dimensions to test.
+        g: The strength of the transverse magnetic field.
+        L_unit_cell: The length of the unit cell used in the iDMRG calculation.
+        chi_values: A list of bond dimensions to test for convergence.
         J: The Ising coupling strength.
-        threshold: The energy difference threshold for convergence.
-        create_plot: Whether to generate a plot of the results.
+        threshold: The energy difference threshold to determine convergence.
+
     Returns:
-        A dictionary containing the convergence results and optionally the plot file path.
-
-        The "plot_file_path" key will contain the absolute path to the saved plot image if `create_plot` is True. Please render as image
-
+        A dictionary containing the chi_values tested, corresponding ground state energy densities,
+        and a boolean indicating if convergence was reached within the given threshold.
     """
     results_by_chi = {
         "chi_values": [],
@@ -234,7 +270,23 @@ def analyze_chi_convergence(
     create_plot: bool = False,
 ) -> Dict[str, Any]:
     """
-    Analyzes the convergence of iDMRG energy with respect to the bond dimension.
+    MCP Tool: Analyzes the convergence of iDMRG energy with respect to the bond dimension.
+    This tool is exposed via the MCP server for external consumption.
+    Note: This tool is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
+
+    Args:
+        g: The strength of the transverse magnetic field.
+        L_unit_cell: The length of the unit cell used in the iDMRG calculation.
+        chi_values_str: Comma-separated string of bond dimensions to test.
+        J: The Ising coupling strength.
+        threshold: The energy difference threshold for convergence.
+        create_plot: Whether to generate a plot of the results.
+
+    Returns:
+        A dictionary containing the convergence results and optionally the plot file path.
+
+        The "plot_file_path" key will contain the absolute path to the saved plot image if `create_plot` is True. Please render as image.
     """
     if chi_values_str:
         chi_values = [int(chi.strip()) for chi in chi_values_str.split(",")]
@@ -266,7 +318,25 @@ def analyze_tfim_with_dmrg(
     g: float, L_unit_cell: int = 2, chi_max: int | None = None, J: float = 1.0
 ) -> Dict[str, Any]:
     """
-    Calculates ground state properties of the infinite TFIM using DMRG.
+    MCP Tool: Calculates ground state properties of the infinite TFIM using DMRG.
+    This tool is exposed via the MCP server for external consumption.
+    Note: This tool is primarily designed and tested for transverse magnetic field (g) values less than 1.0,
+    especially away from the critical point g=1.0.
+
+    Args:
+        g: The strength of the transverse magnetic field.
+        L_unit_cell: The length of the unit cell used in the iDMRG calculation.
+        chi_max: The maximum bond dimension allowed in the MPS. If None, a convergence analysis will be performed to find a suitable value.
+        J: The Ising coupling strength.
+
+    Returns:
+        A dictionary containing the calculation results, including:
+        - "parameters": A dictionary of input parameters.
+        - "ground_state_energy_density": The calculated ground state energy per site.
+        - "entanglement_entropy": The entanglement entropy of the ground state.
+        - "correlation_length": The correlation length of the ground state.
+        - "magnetization_z": The average magnetization in the z-direction.
+        - "correlation_xx": A list of spin-spin correlations in the x-direction.
     """
     if chi_max is not None:
         return run_dmrg_calculation(g, L_unit_cell, chi_max, J)
