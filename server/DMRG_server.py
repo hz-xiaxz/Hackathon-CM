@@ -190,7 +190,7 @@ def analyze_L_convergence(
     if L_values_str:
         L_values = [int(L.strip()) for L in L_values_str.split(",")]
     else:
-        L_values = [2, 4, 6, 8, 10]
+        L_values = [2, 6, 10, 14]
 
     if chi_max is None:
         largest_L = max(L_values)
